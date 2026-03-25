@@ -1,6 +1,6 @@
 # 📊 Visual Sentiment Analysis using Deep Learning
 
-This project implements a **visual sentiment analysis system** that predicts human emotions from facial images and maps them into multiple sentiment scales.
+This project implements a **visual sentiment analysis system** that predicts human emotions from facial images and maps them into multiple sentiment scales (3, 5, and 7 levels).
 
 ---
 
@@ -8,87 +8,89 @@ This project implements a **visual sentiment analysis system** that predicts hum
 
 - Dataset: FER2013  
 - Models Used:
-  - ResNet18 (Transfer Learning)
-  - EfficientNet
-  - DietNet  
+  - ConvNeXt-V2  
+  - DeiT (Vision Transformer)  
+  - EfficientNet-B0  
+  - Ensemble Model (Smart Decider)  
 - Framework: PyTorch  
 
 The system:
 - Classifies facial emotions (7 classes)
 - Converts emotions into sentiment scores
-- Supports 3, 5, and 7-level sentiment scales
+- Supports multi-scale sentiment analysis (3, 5, 7)
 
 ---
 
 ## 🧠 Models Used
 
-### 🔹 ResNet18
-- Pretrained model
-- Used as baseline
-- Frozen layers + custom classifier
+### 🔹 ConvNeXt-V2
+- Strong feature extraction performance  
 
-### 🔹 EfficientNet
-- More efficient and scalable architecture
-- Better feature extraction with fewer parameters
+### 🔹 DeiT (Vision Transformer)
+- Captures global dependencies in images  
 
-### 🔹 DietNet
-- Lightweight architecture
-- Designed for efficient learning with reduced complexity
+### 🔹 EfficientNet-B0
+- Efficient and lightweight architecture  
+
+### 🔹 Ensemble Model (Smart Decider)
+- Combines predictions from multiple models  
+- Achieves highest accuracy  
 
 ---
 
 ## 📂 Dataset
 
-- FER2013 (48x48 grayscale images)
+- FER2013 (48x48 grayscale images)  
 - Preprocessing:
-  - Resize to 224x224
-  - Convert to 3-channel
-  - Normalize for pretrained models
+  - Resize to 224x224  
+  - Convert to 3-channel  
+  - Normalize  
 
 ---
 
 ## ⚙️ Features
 
-- Multi-model comparison (ResNet18, EfficientNet, DietNet)
-- Emotion classification (7 classes)
-- Multi-scale sentiment mapping (3, 5, 7)
-- Training and validation pipeline
-- Model evaluation
+- Multi-model comparison  
+- Emotion classification (7 classes)  
+- Multi-scale sentiment mapping (3, 5, 7)  
+- Ensemble learning  
 
 ---
 
-## 📈 Sentiment Mapping
+## 📊 Results
 
-| Emotion   | Sentiment |
-|----------|----------|
-| Happy    | Positive |
-| Neutral  | Neutral  |
-| Angry    | Negative |
-| Sad      | Negative |
-| Surprise | Positive |
+### 🔹 Model Performance
+
+| Model                      | 7-Scale | 5-Scale | 3-Scale |
+|---------------------------|--------|--------|--------|
+| ConvNeXt-V2               | 88.59% | 89.73% | 91.69% |
+| DeiT (Vision Transformer) | 85.89% | 87.26% | 89.83% |
+| EfficientNet-B0           | 82.17% | 83.25% | 86.67% |
+
+---
+
+### 🧠 Ensemble Model
+
+🔥 **Final Accuracy:**
+- 7-Scale: **96.12%**
+- 5-Scale: **96.38%**
+- 3-Scale: **97.10%**
 
 ---
 
-## 🛠️ Tech Stack
-
-- Python  
-- PyTorch  
-- Torchvision  
-- Pandas  
-- NumPy  
-- Matplotlib  
-
----
 ## ▶️ How to Run
 
-1. Clone the repository:
 ```bash
 git clone https://github.com/your-username/Sentiment_Analysis.git
-```
-
-2. Install dependencies:
-```bash
+cd Sentiment_Analysis
 pip install torch torchvision pandas matplotlib
 ```
 
-3. Run the notebook using Jupyter or Google Colab
+Open `visual_sentiment_analysis.ipynb` in Jupyter or Google Colab and run all cells.
+
+---
+
+## 📦 Model Weights
+
+Trained weights are not included due to size limitations.  
+You can train the models using the provided notebook.

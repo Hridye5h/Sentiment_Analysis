@@ -77,8 +77,8 @@ On Kaggle: add the **`raf-db-emotion-classification-challenge`** dataset, enable
 
 | Notebook | Description |
 | --- | --- |
-| `sota-facial-recognition.ipynb` | DDAMFN fine-tuning + evaluation (single model). |
-| `facial-emotion-recognition.ipynb` | DDAMFN + ConvNeXt-V2 stacking ensemble with ablation. |
+| `facial-emotion-recognition.ipynb` | DDAMFN fine-tuning, evaluation, and Grad-CAM explainability (single model). |
+| `facial-emotion-recognition-ensemble.ipynb` | DDAMFN + ConvNeXt-V2 stacking ensemble with ablation. |
 
 ## Limitations
 - **Class imbalance:** Fear (recall 0.68) and Disgust (0.74) are the weakest classes due to few samples;

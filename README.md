@@ -6,7 +6,7 @@ Facial emotion recognition on **RAF-DB**, mapped onto **3-, 5-, and 7-level sent
 robustness, occlusion and calibration, explained with Grad-CAM, and deployed as a live web demo.
 
 **▶ Live demo:** [huggingface.co/spaces/Hr1dye5h/facial-emotion-recognition](https://huggingface.co/spaces/Hr1dye5h/facial-emotion-recognition)
-(Grad-CAM explanations · real-time webcam · group-photo mood meter · calibrated confidences)
+(Grad-CAM explanations · real-time webcam · group-photo mood meter · specialist / generalist model switch)
 
 ![Grad-CAM explanation](assets/gradcam_explainer_example.png)
 
@@ -117,7 +117,7 @@ The RAF-DB-trained model is evaluated **without any retraining** on two other be
 | --- | --- | --- | --- | --- |
 | RAF-DB (in-domain) | 3,068 | 91.07% | 84.64% | real-world colour faces |
 | **FER2013** test | 7,178 | **55.29%** | 50.89% | 48×48 grayscale web faces; human agreement ≈ 65% |
-| **CK+** | posed | **77.02%** | 69.16% | lab-posed expressions; no *neutral* class, *contempt* excluded |
+| **CK+** | 927 | **77.02%** | 69.16% | lab-posed expressions; no *neutral* class, *contempt* excluded |
 
 Happiness (85–100% recall) and Surprise (78–94%) transfer well. Fear does not (15% on FER2013, 32% on CK+), and
 CK+ *anger* is mostly missed (10%). Those exaggerated lab poses differ from RAF-DB's in-the-wild anger. These
@@ -126,20 +126,43 @@ natural next step.
 
 ![Cross-dataset](assets/cross_dataset.png)
 
+## Improving generalization — multi-dataset training (`facial-emotion-multidataset.ipynb`)
+Trained on RAF-DB alone, the model scores only 55% on FER2013 because of a **domain gap**: FER2013 faces are 48×48
+grayscale. The RAF-DB model was fine-tuned on **RAF-DB + FER2013 together**:
+- Starts from the RAF-DB checkpoint (12 epochs, SAM + attention-diversity loss, label smoothing 0.1).
+- **Domain-balanced sampling:** each batch is about half RAF-DB and half FER2013.
+- **Domain-bridging augmentation:** random grayscale and low-resolution simulation.
+- Model selection uses the RAF-DB and FER2013 *validation* splits only. **CK+ is never used for training.**
+
+| Test set (evaluated once) | RAF-DB only | **RAF-DB + FER2013 (generalist)** |
+| --- | --- | --- |
+| RAF-DB | 91.07% / 84.64% | 90.81% / 84.45% |
+| FER2013 | 55.29% / 50.89% | **69.00% / 64.77%** |
+| CK+ (never trained on) | 77.02% / 69.16% | **78.96% / 73.40%** |
+
+*(overall / mean-class)*
+
+FER2013 rises by **+13.7 points**, past the ~65% human-agreement level, while RAF-DB accuracy holds
+(−0.26 points). The model also improves on **CK+, which it never saw** (+1.9 overall, +4.2 mean-class), so it
+genuinely generalizes better rather than just fitting FER2013. The live demo uses this generalist by default and
+can switch back to the RAF-DB specialist.
+
+![Multi-dataset training](assets/multidataset_before_after.png)
+
 ## Deployment — ONNX export & INT8 quantization
 The model is exported to **ONNX** as a static batch-1 graph. The model's coordinate-attention block splits on
 runtime height/width, so dynamic-shape export fails. The model is then statically quantized to **INT8**
 (QDQ, per-channel), calibrated on validation images only. Measured on a laptop CPU, batch 1:
 
-| Runtime | Latency / face | File size | Output vs PyTorch |
+| Runtime | Latency / face (laptop) | File size | RAF-DB test accuracy |
 | --- | --- | --- | --- |
-| PyTorch FP32 | 31.8 ms | 17.4 MB | — |
-| **ONNX Runtime FP32** | **17.2 ms (1.9× faster)** | 16.8 MB | identical (max abs diff 1e-6) |
-| ONNX Runtime INT8 | 21.0 ms | **6.4 MB (2.6× smaller)** | quantized |
+| PyTorch FP32 | 31.8 ms | 17.4 MB | 91.07% |
+| **ONNX Runtime FP32** | **17.2 ms (1.9× faster)** | 16.8 MB | **91.07%** (identical predictions on 100% of test images) |
+| ONNX Runtime INT8 | 21.0 ms | **6.4 MB (2.6× smaller)** | 90.06% (−1.0 pt; mean-class 81.1%) |
 
-INT8 shrinks the model 2.6× but is not faster than ONNX FP32 on this CPU, which lacks fast INT8 kernels for
-depthwise convolutions. For a server, ONNX FP32 is the best choice. INT8 makes sense where storage or download
-size matters, for example mobile or the browser.
+ONNX FP32 is a free ~2× speed-up with no accuracy cost. INT8 trades 1 point of accuracy, and more on the rare
+classes, for a 2.6× smaller file. It is not faster on this CPU, which lacks fast INT8 depthwise-convolution
+kernels. That makes it worth using only where size matters, such as mobile or the browser.
 
 ![Deployment](assets/deployment_onnx_int8.png)
 
@@ -172,11 +195,12 @@ On Kaggle: add the **RAF-DB dataset** (`train_labels.csv`, `test_labels.csv`, im
 | `facial-emotion-recognition.ipynb` | DDAMFN fine-tuning, evaluation, and Grad-CAM explainability (single model). |
 | `facial-emotion-recognition-ensemble.ipynb` | DDAMFN + ConvNeXt-V2 ensemble with ablation. |
 | `facial-emotion-analysis.ipynb` | Robustness, occlusion, calibration, failure analysis, t-SNE and per-emotion Grad-CAM (needs the trained checkpoint). |
+| `facial-emotion-multidataset.ipynb` | Fine-tunes the model on RAF-DB + FER2013 (the generalist); evaluates on RAF-DB, FER2013 and the held-out CK+. |
 | `facial-emotion-generalization.ipynb` | Zero-shot evaluation on FER2013 and CK+, plus ONNX export and INT8 quantization (needs the checkpoint, FER2013 and CK+). |
 
 ## Limitations
 - **Class imbalance:** Fear (recall 0.68) and Disgust (0.74) are the weakest classes because they have few samples.
-- **Domain shift:** 55% on FER2013 and 77% on CK+ without retraining. The model is strongest on real-world colour faces like RAF-DB.
+- **Domain shift:** the RAF-DB-only model drops to 55% on FER2013. Multi-dataset training raises this to 69%, but very low-quality or unusual faces remain harder.
 - **Occlusion and image quality:** masks, heavy blur and very low resolution reduce accuracy noticeably (see above).
 - **Expression ≠ emotion:** the model reads facial expressions, not what a person actually feels. RAF-DB is internet
   imagery and may not represent every demographic equally. This is not a tool for judging people.

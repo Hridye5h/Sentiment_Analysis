@@ -1,8 +1,14 @@
 # Visual Sentiment Analysis — Facial Emotion Recognition (RAF-DB)
 
-Facial emotion recognition on **RAF-DB**, mapped onto **3-, 5-, and 7-level sentiment scales**. The project
-fine-tunes a **DDAMFN** model and builds a two-model **stacking ensemble** (DDAMFN + ConvNeXt-V2), reaching
-**91.6% overall accuracy** on the official test set — on par with published state of the art.
+Facial emotion recognition on **RAF-DB**, mapped onto **3-, 5-, and 7-level sentiment scales**. A fine-tuned
+**DDAMFN** model reaches **91.07%** on the official test set (close to published state of the art) with only
+**4.19 M parameters**. A soft-vote ensemble with ConvNeXt-V2 reaches **91.59%**. The model is stress-tested for
+robustness, occlusion and calibration, explained with Grad-CAM, and deployed as a live web demo.
+
+**▶ Live demo:** [huggingface.co/spaces/Hr1dye5h/facial-emotion-recognition](https://huggingface.co/spaces/Hr1dye5h/facial-emotion-recognition)
+(Grad-CAM explanations · real-time webcam · group-photo mood meter)
+
+![Grad-CAM explanation](assets/gradcam_explainer_example.png)
 
 ---
 
@@ -13,8 +19,8 @@ fine-tunes a **DDAMFN** model and builds a two-model **stacking ensemble** (DDAM
 
 ## Dataset — RAF-DB (Real-world Affective Faces Database)
 - **RAF-DB basic** subset: **12,271 training** / **3,068 test** images across 7 basic emotions.
-- Aligned RGB faces. The dataset is **imbalanced** — Happiness dominates while Fear and Disgust are rare,
-  which is reflected in the mean-class (balanced) accuracy below.
+- Aligned RGB faces. The dataset is **imbalanced**: Happiness dominates while Fear and Disgust are rare.
+  That is why mean-class (balanced) accuracy is reported alongside overall accuracy.
 
 ## Results
 
@@ -25,7 +31,8 @@ fine-tunes a **DDAMFN** model and builds a two-model **stacking ensemble** (DDAM
 | 7-class mean-class (balanced) | 84.64% |
 | 5-scale accuracy | 92.11% |
 | 3-scale (valence) accuracy | 92.89% |
-| Trainable parameters | 4.19 M |
+| Parameters / compute | 4.19 M / 1.08 GFLOPs |
+| CPU latency (batch 1, laptop) | ~60 ms per face |
 
 Per-class (test set):
 
@@ -39,52 +46,106 @@ Per-class (test set):
 | Anger | 0.914 | 0.858 | 0.885 | 162 |
 | Neutral | 0.875 | 0.921 | 0.898 | 680 |
 
-### Stacking ensemble (DDAMFN + ConvNeXt-V2)
-Ablation on the test set:
+### Ensemble (DDAMFN + ConvNeXt-V2) — ablation on the test set
 
 | Model | Overall | Mean-class |
 | --- | --- | --- |
 | DDAMFN | 91.07% | 84.64% |
 | ConvNeXt-V2 | 87.29% | 78.10% |
-| Soft-vote average | 91.59% | 84.95% |
-| **Stacking (Logistic Regression)** | **91.62%** | 83.69% |
+| **Soft-vote average** | 91.59% | **84.95%** |
+| Stacking (Logistic Regression) | **91.62%** | 83.69% |
 
-Ensemble sentiment scales: **3-scale 93.61%**, **5-scale 92.76%**. The soft-vote average gives the best
-balance of overall and mean-class accuracy, improving on either base model.
+**Finding:** the simple soft-vote average is the best overall model. It matches the trained stacker on overall
+accuracy (a 0.03-point gap is about one image) and is better on mean-class accuracy. The stacker got its tiny
+overall gain by giving up the rare *Fear* class (recall 0.68 → 0.55). Ensemble sentiment scales:
+3-scale 93.61%, 5-scale 92.76%.
 
 ### State-of-the-art context (RAF-DB, 7-class overall accuracy)
-| Method | Overall acc | Year |
-| --- | --- | --- |
-| Ig3D | 94.0% | 2024 |
-| POSTER++ | 92.21% | 2023 |
-| **This project (ensemble)** | **91.62%** | — |
-| DDAMFN (paper) | 91.35% | 2023 |
+| Method | Overall acc | Params | Year |
+| --- | --- | --- | --- |
+| Ig3D | 94.0% | — | 2024 |
+| POSTER++ | 92.21% | 43.7 M | 2023 |
+| **This project (soft-vote ensemble)** | **91.59%** | 32.8 M | — |
+| DDAMFN (paper) | 91.35% | 4.1 M | 2023 |
+| **This project (DDAMFN, single model)** | **91.07%** | **4.19 M** | — |
+
+The single model is within about 1 point of POSTER++ with roughly **10× fewer parameters** and **8× less compute**.
+
+## Model analysis (`facial-emotion-analysis.ipynb`)
+The trained model is tested beyond one accuracy number. No retraining is done, and the clean result reproduces 91.07% exactly.
+
+**Robustness to real-world degradations.** Accuracy stays within ~2 points of clean under moderate low light and
+JPEG compression. Heavy blur and very low resolution (20 px) are the main failure modes (~71%).
+
+| Degradation | Mild | Moderate | Severe |
+| --- | --- | --- | --- |
+| Gaussian blur (σ = 1 / 2 / 3) | 89.44% | 81.75% | 71.12% |
+| Low light (50% / 30% / 15%) | 90.35% | 89.02% | 83.44% |
+| Sensor noise (σ = 10 / 25 / 45) | 90.22% | 85.92% | 76.50% |
+| JPEG (q = 30 / 15 / 5) | 90.38% | 89.05% | 81.88% |
+| Low resolution (56 / 32 / 20 px) | 89.57% | 83.21% | 70.73% |
+
+![Robustness](assets/robustness_curves.png)
+
+**Occlusion — what does each emotion need to see?** A face mask costs far more than sunglasses
+(74.8% vs 85.1% overall). *Happiness* depends on the mouth (recall 97% → 79% with a mask, 95% with sunglasses).
+*Sadness* depends on the eyes and brows (88% → 80% with sunglasses, 86% with a mask). *Fear* and *Disgust*
+need the whole face and collapse under either occlusion.
+
+![Occlusion](assets/occlusion_per_class.png)
+
+**Where the model looks.** Average Grad-CAM over correctly classified test faces. Each emotion uses different
+facial evidence, for example the mouth for Disgust and the eyes/brows region for Sadness.
+
+![Grad-CAM per emotion](assets/gradcam_per_emotion.png)
+
+**Calibration.** The raw model is slightly over-confident (ECE 3.80%). One temperature (T = 1.55), fitted on the
+*validation* split, brings test ECE down to **1.40%** without changing accuracy. The confidence scores shown in the
+demo can therefore be trusted.
+
+**Embedding space.** t-SNE of the 512-d features shows clean clusters for Happiness, Sadness, Surprise and Anger.
+Neutral sits in the middle, which matches the most common confusions (Sadness ↔ Neutral, Happiness → Neutral).
+
+![t-SNE](assets/tsne_embeddings.png)
+
+**Test-time augmentation.** Horizontal-flip averaging adds only +0.03 points, so it is not used.
 
 ## Method
 - **DDAMFN** (Dual-Direction Attention Mixed Feature Network): a MixedFeatureNet backbone pretrained on
-  **MS-Celeb-1M**, with a dual-direction attention head, trained using **SAM** (Sharpness-Aware Minimization)
-  and an attention-diversity loss at 112×112 (only 4.19 M parameters).
-- **ConvNeXt-V2** (tiny): ImageNet-pretrained, fine-tuned with AdamW, label smoothing, and a cosine schedule at 224×224.
-- **Ensemble:** a Logistic Regression meta-learner over the two models' softmax probabilities (14 features).
+  **MS-Celeb-1M** with a dual-direction attention head. It is trained with **SAM** (Sharpness-Aware Minimization)
+  and an attention-diversity loss at 112×112.
+- **ConvNeXt-V2** (tiny): ImageNet-pretrained, fine-tuned with AdamW, label smoothing and a cosine schedule at 224×224.
+- **Ensemble:** soft-vote average and a Logistic Regression meta-learner over the two models' softmax probabilities.
+- **Explainability:** Grad-CAM on the final feature map, summarised over five facial regions and turned into a
+  plain-English explanation.
 
 ## Evaluation protocol
-- A stratified **validation** split is carved from the training data; the **3,068 test images are evaluated once**.
-- Both base models train on **train**; the meta-learner is fit on **validation**; **test** is held out for final reporting.
-- Reports **overall** and **mean-class (balanced)** accuracy, with one consistent 3-/5-scale mapping.
+- A stratified **validation** split is carved from the training data. The **3,068 test images are evaluated once**.
+- Base models train on **train**. The meta-learner and the calibration temperature are fit on **validation**.
+  **Test** is used only for final reporting.
+- Both **overall** and **mean-class (balanced)** accuracy are reported, with one consistent 3-/5-scale mapping.
+
+## Deployment
+A Gradio app on Hugging Face Spaces (CPU). It detects faces with OpenCV **YuNet**, aligns them using the eye
+landmarks and crops them tightly to match RAF-DB's aligned faces. Crop geometry matters: on a group photo of
+smiling people, a loose crop that includes hair and shoulders flipped 7 of 9 faces away from *Happiness*, while
+the RAF-DB-style tight crop got all 9 right.
 
 ## Reproduce
-On Kaggle: add the **`raf-db-emotion-classification-challenge`** dataset, enable **GPU** and **Internet**, then Run All.
+On Kaggle: add the **RAF-DB dataset** (`train_labels.csv`, `test_labels.csv`, images), enable **GPU**, then Run All.
 
 | Notebook | Description |
 | --- | --- |
 | `facial-emotion-recognition.ipynb` | DDAMFN fine-tuning, evaluation, and Grad-CAM explainability (single model). |
-| `facial-emotion-recognition-ensemble.ipynb` | DDAMFN + ConvNeXt-V2 stacking ensemble with ablation. |
+| `facial-emotion-recognition-ensemble.ipynb` | DDAMFN + ConvNeXt-V2 ensemble with ablation. |
+| `facial-emotion-analysis.ipynb` | Robustness, occlusion, calibration, failure analysis, t-SNE and per-emotion Grad-CAM (needs the trained checkpoint). |
 
 ## Limitations
-- **Class imbalance:** Fear (recall 0.68) and Disgust (0.74) are the weakest classes due to few samples;
-  mean-class accuracy trails overall accuracy by ~6 points as a result.
-- **Sentiment scales:** the 3-/5-scale numbers are higher than 7-class because grouping emotions yields coarser classes.
-- All figures are on the standard RAF-DB test split and are not directly comparable to other datasets.
+- **Class imbalance:** Fear (recall 0.68) and Disgust (0.74) are the weakest classes because they have few samples.
+- **Occlusion and image quality:** masks, heavy blur and very low resolution reduce accuracy noticeably (see above).
+- **Expression ≠ emotion:** the model reads facial expressions, not what a person actually feels. RAF-DB is internet
+  imagery and may not represent every demographic equally. This is not a tool for judging people.
+- The 3-/5-scale numbers are higher than 7-class because grouping emotions gives coarser classes.
 
 ## References
 - **DDAMFN** — S. Zhang et al., *A Dual-Direction Attention Mixed Feature Network for Facial Expression
@@ -92,3 +153,5 @@ On Kaggle: add the **`raf-db-emotion-classification-challenge`** dataset, enable
 - **POSTER++** — J. Mao et al., *POSTER V2: A Simpler and Stronger Facial Expression Recognition Network*, 2023.
 - **RAF-DB** — S. Li, W. Deng, *Reliable Crowdsourcing and Deep Locality-Preserving Learning for Expression
   Recognition in the Wild*, CVPR 2017.
+- **Temperature scaling** — C. Guo et al., *On Calibration of Modern Neural Networks*, ICML 2017.
+- **YuNet** — W. Wu et al., *YuNet: A Tiny Millisecond-level Face Detector*, Machine Intelligence Research, 2023.

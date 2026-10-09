@@ -6,7 +6,7 @@ Facial emotion recognition on **RAF-DB**, mapped onto **3-, 5-, and 7-level sent
 robustness, occlusion and calibration, explained with Grad-CAM, and deployed as a live web demo.
 
 **▶ Live demo:** [huggingface.co/spaces/Hr1dye5h/facial-emotion-recognition](https://huggingface.co/spaces/Hr1dye5h/facial-emotion-recognition)
-(Grad-CAM explanations · real-time webcam · group-photo mood meter)
+(Grad-CAM explanations · real-time webcam · group-photo mood meter · calibrated confidences)
 
 ![Grad-CAM explanation](assets/gradcam_explainer_example.png)
 
@@ -32,7 +32,7 @@ robustness, occlusion and calibration, explained with Grad-CAM, and deployed as 
 | 5-scale accuracy | 92.11% |
 | 3-scale (valence) accuracy | 92.89% |
 | Parameters / compute | 4.19 M / 1.08 GFLOPs |
-| CPU latency (batch 1, laptop) | ~60 ms per face |
+| CPU latency (batch 1, laptop) | ~30 ms per face (PyTorch) · ~17 ms (ONNX) |
 
 Per-class (test set):
 
@@ -110,6 +110,39 @@ Neutral sits in the middle, which matches the most common confusions (Sadness �
 
 **Test-time augmentation.** Horizontal-flip averaging adds only +0.03 points, so it is not used.
 
+## Generalization — datasets the model has never seen (`facial-emotion-generalization.ipynb`)
+The RAF-DB-trained model is evaluated **without any retraining** on two other benchmarks:
+
+| Test set | Images | Overall | Mean-class | Notes |
+| --- | --- | --- | --- | --- |
+| RAF-DB (in-domain) | 3,068 | 91.07% | 84.64% | real-world colour faces |
+| **FER2013** test | 7,178 | **55.29%** | 50.89% | 48×48 grayscale web faces; human agreement ≈ 65% |
+| **CK+** | posed | **77.02%** | 69.16% | lab-posed expressions; no *neutral* class, *contempt* excluded |
+
+Happiness (85–100% recall) and Surprise (78–94%) transfer well. Fear does not (15% on FER2013, 32% on CK+), and
+CK+ *anger* is mostly missed (10%). Those exaggerated lab poses differ from RAF-DB's in-the-wild anger. These
+numbers show the model's honest limits outside its training distribution. Fine-tuning on mixed datasets is the
+natural next step.
+
+![Cross-dataset](assets/cross_dataset.png)
+
+## Deployment — ONNX export & INT8 quantization
+The model is exported to **ONNX** as a static batch-1 graph. The model's coordinate-attention block splits on
+runtime height/width, so dynamic-shape export fails. The model is then statically quantized to **INT8**
+(QDQ, per-channel), calibrated on validation images only. Measured on a laptop CPU, batch 1:
+
+| Runtime | Latency / face | File size | Output vs PyTorch |
+| --- | --- | --- | --- |
+| PyTorch FP32 | 31.8 ms | 17.4 MB | — |
+| **ONNX Runtime FP32** | **17.2 ms (1.9× faster)** | 16.8 MB | identical (max abs diff 1e-6) |
+| ONNX Runtime INT8 | 21.0 ms | **6.4 MB (2.6× smaller)** | quantized |
+
+INT8 shrinks the model 2.6× but is not faster than ONNX FP32 on this CPU, which lacks fast INT8 kernels for
+depthwise convolutions. For a server, ONNX FP32 is the best choice. INT8 makes sense where storage or download
+size matters, for example mobile or the browser.
+
+![Deployment](assets/deployment_onnx_int8.png)
+
 ## Method
 - **DDAMFN** (Dual-Direction Attention Mixed Feature Network): a MixedFeatureNet backbone pretrained on
   **MS-Celeb-1M** with a dual-direction attention head. It is trained with **SAM** (Sharpness-Aware Minimization)
@@ -139,9 +172,11 @@ On Kaggle: add the **RAF-DB dataset** (`train_labels.csv`, `test_labels.csv`, im
 | `facial-emotion-recognition.ipynb` | DDAMFN fine-tuning, evaluation, and Grad-CAM explainability (single model). |
 | `facial-emotion-recognition-ensemble.ipynb` | DDAMFN + ConvNeXt-V2 ensemble with ablation. |
 | `facial-emotion-analysis.ipynb` | Robustness, occlusion, calibration, failure analysis, t-SNE and per-emotion Grad-CAM (needs the trained checkpoint). |
+| `facial-emotion-generalization.ipynb` | Zero-shot evaluation on FER2013 and CK+, plus ONNX export and INT8 quantization (needs the checkpoint, FER2013 and CK+). |
 
 ## Limitations
 - **Class imbalance:** Fear (recall 0.68) and Disgust (0.74) are the weakest classes because they have few samples.
+- **Domain shift:** 55% on FER2013 and 77% on CK+ without retraining. The model is strongest on real-world colour faces like RAF-DB.
 - **Occlusion and image quality:** masks, heavy blur and very low resolution reduce accuracy noticeably (see above).
 - **Expression ≠ emotion:** the model reads facial expressions, not what a person actually feels. RAF-DB is internet
   imagery and may not represent every demographic equally. This is not a tool for judging people.
@@ -154,4 +189,6 @@ On Kaggle: add the **RAF-DB dataset** (`train_labels.csv`, `test_labels.csv`, im
 - **RAF-DB** — S. Li, W. Deng, *Reliable Crowdsourcing and Deep Locality-Preserving Learning for Expression
   Recognition in the Wild*, CVPR 2017.
 - **Temperature scaling** — C. Guo et al., *On Calibration of Modern Neural Networks*, ICML 2017.
+- **FER2013** — I. Goodfellow et al., *Challenges in Representation Learning: A report on three machine learning contests*, 2013.
+- **CK+** — P. Lucey et al., *The Extended Cohn-Kanade Dataset (CK+)*, CVPR Workshops 2010.
 - **YuNet** — W. Wu et al., *YuNet: A Tiny Millisecond-level Face Detector*, Machine Intelligence Research, 2023.

@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Facial Emotion Recognition</title>
+<meta name="description" content="Real-time facial emotion recognition that runs entirely in your browser. DDAMFN trained on RAF-DB + FER2013.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎭</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f6f7fb; --surface:#ffffff; --surface-2:#f1f3f9; --border:#e3e6ef;
+  --text:#14172a; --text-2:#4a5068; --muted:#7a8099;
+  --accent:#5b5bf6; --accent-2:#8b5cf6; --accent-soft:rgba(91,91,246,.10);
+  --pos:#16a34a; --neu:#64748b; --neg:#dc2626;
+  --shadow:0 1px 2px rgba(20,23,42,.06),0 8px 24px rgba(20,23,42,.06);
+  --radius:16px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0b0d17; --surface:#131628; --surface-2:#1a1e35; --border:#262b47;
+    --text:#eef0fb; --text-2:#b4b9d6; --muted:#8188a8;
+    --accent:#7c7cff; --accent-2:#a78bfa; --accent-soft:rgba(124,124,255,.14);
+    --pos:#22c55e; --neu:#94a3b8; --neg:#f87171;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0b0d17; --surface:#131628; --surface-2:#1a1e35; --border:#262b47;
+  --text:#eef0fb; --text-2:#b4b9d6; --muted:#8188a8;
+  --accent:#7c7cff; --accent-2:#a78bfa; --accent-soft:rgba(124,124,255,.14);
+  --pos:#22c55e; --neu:#94a3b8; --neg:#f87171;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box} html,body{margin:0} [hidden]{display:none!important}
+body{background:var(--bg);color:var(--text);font:15px/1.55 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+.wrap{max-width:1180px;margin:0 auto;padding:0 20px}
+/* header */
+header{position:relative;overflow:hidden;border-bottom:1px solid var(--border)}
+header::before{content:"";position:absolute;inset:-40% -10% auto -10%;height:120%;background:radial-gradient(60% 60% at 20% 30%,rgba(91,91,246,.22),transparent 70%),radial-gradient(50% 60% at 85% 10%,rgba(236,72,153,.16),transparent 70%);pointer-events:none}
+.hero{position:relative;padding:34px 0 26px;display:flex;gap:28px;align-items:flex-end;justify-content:space-between;flex-wrap:wrap}
+.brand{display:flex;gap:14px;align-items:center}
+.logo{width:52px;height:52px;border-radius:14px;display:grid;place-items:center;font-size:28px;background:linear-gradient(135deg,var(--accent),var(--accent-2));box-shadow:0 8px 24px rgba(91,91,246,.35)}
+h1{font-size:clamp(24px,3.4vw,34px);line-height:1.15;margin:0;font-weight:800;letter-spacing:-.02em}
+.sub{color:var(--text-2);margin:6px 0 0;max-width:640px}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;background:var(--surface);border:1px solid var(--border);font-size:13px;color:var(--text-2);box-shadow:var(--shadow)}
+.chip b{color:var(--text)}
+.chip.privacy{background:var(--accent-soft);border-color:transparent;color:var(--accent);font-weight:600}
+.hero-right{display:flex;gap:10px;align-items:center}
+.btn{appearance:none;border:1px solid var(--border);background:var(--surface);color:var(--text);padding:9px 14px;border-radius:11px;font:600 14px Inter,sans-serif;cursor:pointer;display:inline-flex;gap:8px;align-items:center;transition:transform .08s,background .15s}
+.btn:hover{background:var(--surface-2)} .btn:active{transform:scale(.98)}
+.btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;border-color:transparent;box-shadow:0 6px 18px rgba(91,91,246,.35)}
+.btn.primary:hover{filter:brightness(1.06)}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+/* toolbar */
+.toolbar{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:22px 0 16px}
+.tabs{display:flex;gap:4px;background:var(--surface);border:1px solid var(--border);padding:4px;border-radius:13px;box-shadow:var(--shadow);overflow-x:auto;max-width:100%}
+.tab{border:0;background:transparent;color:var(--text-2);padding:9px 14px;border-radius:9px;font:600 14px Inter,sans-serif;cursor:pointer;white-space:nowrap}
+.tab[aria-selected="true"]{background:var(--accent-soft);color:var(--accent)}
+.seg{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+.seg select{font:600 13px Inter,sans-serif;color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 10px}
+/* layout */
+.grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:18px}
+@media (max-width:900px){.grid{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px}
+.card h3{margin:0 0 12px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.panel{display:none} .panel.active{display:block;animation:fade .25s ease}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+/* stage */
+.stage{position:relative;border-radius:12px;overflow:hidden;background:var(--surface-2);aspect-ratio:4/3;display:grid;place-items:center}
+.stage canvas,.stage video{width:100%;height:100%;object-fit:contain;display:block}
+.stage .placeholder{position:absolute;inset:0;display:grid;place-items:center;text-align:center;color:var(--muted);padding:24px}
+.stage .placeholder .big{font-size:44px;margin-bottom:8px}
+.drop{border:2px dashed var(--border);transition:border-color .15s,background .15s;cursor:pointer}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.examples{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.examples img{width:64px;height:48px;object-fit:cover;border-radius:8px;border:2px solid transparent;cursor:pointer;transition:border-color .15s,transform .1s}
+.examples img:hover{border-color:var(--accent);transform:translateY(-1px)}
+.muted{color:var(--muted);font-size:13px}
+.fps{position:absolute;top:10px;left:10px;font:500 12px "JetBrains Mono",monospace;background:rgba(0,0,0,.55);color:#fff;padding:3px 8px;border-radius:7px}
+/* result */
+.verdict{display:flex;gap:14px;align-items:center;margin-bottom:14px}
+.verdict .emoji{font-size:54px;line-height:1}
+.verdict .name{font-size:26px;font-weight:800;letter-spacing:-.01em}
+.pill{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700;margin-top:4px}
+.pill.Positive{background:color-mix(in srgb,var(--pos) 16%,transparent);color:var(--pos)}
+.pill.Neutral{background:color-mix(in srgb,var(--neu) 18%,transparent);color:var(--neu)}
+.pill.Negative{background:color-mix(in srgb,var(--neg) 16%,transparent);color:var(--neg)}
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:110px 1fr 46px;gap:10px;align-items:center;font-size:13.5px}
+.bar .track{height:10px;border-radius:99px;background:var(--surface-2);overflow:hidden}
+.bar .fill{height:100%;border-radius:99px;transition:width .35s ease}
+.bar .v{text-align:right;font:500 12.5px "JetBrains Mono",monospace;color:var(--text-2)}
+.note{margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--surface-2);color:var(--text-2);font-size:13.5px}
+.explain{display:grid;grid-template-columns:150px 1fr;gap:14px;align-items:center;margin-top:14px}
+.explain canvas{width:150px;height:150px;border-radius:12px}
+@media (max-width:520px){.explain{grid-template-columns:1fr}}
+.gauge{position:relative;height:14px;border-radius:99px;background:linear-gradient(90deg,var(--neg),var(--neu) 50%,var(--pos));margin:10px 0 6px}
+.gauge .needle{position:absolute;top:-6px;width:4px;height:26px;border-radius:3px;background:var(--text);transform:translateX(-2px);transition:left .4s}
+.gauge-labels{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.facelist{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px;margin-top:12px}
+.face{background:var(--surface-2);border-radius:10px;padding:6px;text-align:center;font-size:12px}
+.face canvas{width:100%;aspect-ratio:1;border-radius:7px;display:block;margin-bottom:4px}
+/* loader */
+.loader{position:fixed;inset:auto 16px 16px auto;z-index:20;background:var(--surface);border:1px solid var(--border);box-shadow:var(--shadow);border-radius:14px;padding:12px 14px;min-width:260px;display:none}
+.loader.show{display:block}
+.loader .t{font-size:13px;font-weight:600;margin-bottom:8px}
+.progress{height:6px;border-radius:9px;background:var(--surface-2);overflow:hidden}
+.progress div{height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent-2));transition:width .2s}
+/* about */
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border)} th{color:var(--muted);font-weight:600;font-size:12.5px;text-transform:uppercase;letter-spacing:.04em}
+td.num{font-family:"JetBrains Mono",monospace;font-size:13px}
+tr.hl td{font-weight:700;color:var(--accent)}
+.pipeline{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0 4px}
+.step{background:var(--surface-2);border-radius:10px;padding:8px 11px;font-size:13px;font-weight:600}
+.arrow{color:var(--muted)}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:18px} @media (max-width:900px){.cols{grid-template-columns:1fr}}
+footer{margin:40px 0 30px;color:var(--muted);font-size:13px;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap hero">
+    <div>
+      <div class="brand">
+        <div class="logo">🎭</div>
+        <div>
+          <h1>Facial Emotion Recognition</h1>
+          <p class="sub">Seven emotions in real time, plus an overall sentiment, from a model that runs entirely on this device.</p>
+        </div>
+      </div>
+      <div class="chips">
+        <span class="chip privacy">🔒 Runs 100% in your browser · nothing is uploaded</span>
+        <span class="chip"><b>91%</b> RAF-DB</span>
+        <span class="chip"><b>69%</b> FER2013</span>
+        <span class="chip"><b>79%</b> unseen CK+</span>
+        <span class="chip"><b>4.2 M</b> parameters</span>
+      </div>
+    </div>
+    <div class="hero-right">
+      <a class="btn" href="https://github.com/Hridye5h/Sentiment_Analysis" target="_blank" rel="noopener">⌥ GitHub</a>
+      <button class="btn" id="themeBtn" title="Toggle theme">◐</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="toolbar">
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" aria-selected="true" data-tab="live">🎥 Live camera</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="photo">🖼️ Analyze a photo</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="group">👥 Group mood</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="about">📊 About the model</button>
+    </div>
+    <label class="seg">Model
+      <select id="modelSel">
+        <option value="generalist" selected>Generalist · RAF-DB + FER2013</option>
+        <option value="specialist">Specialist · RAF-DB only</option>
+      </select>
+    </label>
+  </div>
+
+  <!-- LIVE -->
+  <section class="panel active" id="panel-live">
+    <div class="grid">
+      <div class="card">
+        <div class="stage" id="liveStage">
+          <canvas id="liveCanvas"></canvas>
+          <div class="placeholder" id="livePh"><div><div class="big">📷</div><div>Start the camera to see emotions in real time.<br><span class="muted">Video is processed on this device and never sent anywhere.</span></div></div></div>
+          <div class="fps" id="fps" hidden></div>
+        </div>
+        <div class="row">
+          <button class="btn primary" id="camBtn">▶ Start camera</button>
+          <span class="muted" id="liveHint">Works with several people in view. Face the light for best results.</span>
+        </div>
+      </div>
+      <div class="card" id="liveResult">
+        <h3>Main face</h3>
+        <div class="verdict"><div class="emoji" id="liveEmoji">🙂</div><div><div class="name" id="liveName">—</div><span class="pill Neutral" id="livePill">waiting</span></div></div>
+        <div class="bars" id="liveBars"></div>
+        <div class="note" id="liveNote">Predictions are smoothed over a few frames so the label doesn't flicker.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PHOTO -->
+  <section class="panel" id="panel-photo">
+    <div class="grid">
+      <div class="card">
+        <div class="stage drop" id="photoStage">
+          <canvas id="photoCanvas"></canvas>
+          <div class="placeholder" id="photoPh"><div><div class="big">🖼️</div><div><b>Drop a photo here</b> or click to choose one<br><span class="muted">The largest face is analysed</span></div></div></div>
+        </div>
+        <input type="file" id="photoFile" accept="image/*" hidden>
+        <div class="row"><span class="muted">Try:</span><div class="examples" data-target="photo">
+          <img src="examples/migrant_mother.jpg" alt="Example: Migrant Mother (public domain)">
+          <img src="examples/group_crew2.jpg" alt="Example: astronaut crew (public domain)">
+        </div></div>
+      </div>
+      <div class="card">
+        <h3>Prediction</h3>
+        <div class="verdict"><div class="emoji" id="photoEmoji">🙂</div><div><div class="name" id="photoName">—</div><span class="pill Neutral" id="photoPill">no photo yet</span></div></div>
+        <div class="bars" id="photoBars"></div>
+        <div id="photoLowConf"></div>
+        <div class="row"><button class="btn" id="explainBtn" disabled>🔍 Explain this prediction</button><span class="muted" id="explainStatus"></span></div>
+        <div class="explain" id="explainBox" hidden>
+          <canvas id="heatCanvas" width="224" height="224"></canvas>
+          <div><div class="bars" id="regionBars"></div><div class="note" id="explainText"></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- GROUP -->
+  <section class="panel" id="panel-group">
+    <div class="grid">
+      <div class="card">
+        <div class="stage drop" id="groupStage">
+          <canvas id="groupCanvas"></canvas>
+          <div class="placeholder" id="groupPh"><div><div class="big">👥</div><div><b>Drop a group photo</b>: a class, an audience, a team<br><span class="muted">Every face is classified</span></div></div></div>
+        </div>
+        <input type="file" id="groupFile" accept="image/*" hidden>
+        <div class="row"><span class="muted">Try:</span><div class="examples" data-target="group">
+          <img src="examples/group_crew.jpg" alt="Example: astronaut crew (public domain)">
+          <img src="examples/group_crew2.jpg" alt="Example: astronaut crew (public domain)">
+        </div><button class="btn" id="groupCamBtn">📸 Snapshot from camera</button></div>
+      </div>
+      <div class="card">
+        <h3>Room mood</h3>
+        <div class="verdict"><div class="emoji" id="groupEmoji">👥</div><div><div class="name" id="groupName">—</div><span class="muted" id="groupCount"></span></div></div>
+        <div class="gauge"><div class="needle" id="needle" style="left:50%"></div></div>
+        <div class="gauge-labels"><span>Negative</span><span id="moodIdx">mood index —</span><span>Positive</span></div>
+        <h3 style="margin-top:18px">Sentiment split</h3>
+        <div class="bars" id="groupBars"></div>
+        <div class="facelist" id="faceList"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ABOUT -->
+  <section class="panel" id="panel-about">
+    <div class="cols">
+      <div class="card">
+        <h3>How it works</h3>
+        <div class="pipeline"><span class="step">📷 Image / camera</span><span class="arrow">→</span><span class="step">YuNet face detector</span><span class="arrow">→</span><span class="step">Align eyes + tight crop</span><span class="arrow">→</span><span class="step">DDAMFN (ONNX)</span><span class="arrow">→</span><span class="step">7 emotions → sentiment</span></div>
+        <p class="muted">Both networks run in the browser with ONNX Runtime Web (WebAssembly). The emotion model is <b>DDAMFN</b>: a MixedFeatureNet backbone pretrained on MS-Celeb-1M faces with a dual-direction attention head, 4.19 M parameters. The default <b>generalist</b> was fine-tuned on RAF-DB + FER2013 together. Its explanations use <b>occlusion sensitivity</b>: hide part of the face and measure how much the prediction drops.</p>
+        <h3 style="margin-top:16px">Results (test sets, evaluated once)</h3>
+        <table>
+          <tr><th>Model</th><th>RAF-DB</th><th>FER2013</th><th>CK+ (unseen)</th></tr>
+          <tr><td>Specialist (RAF-DB only)</td><td class="num">91.07%</td><td class="num">55.29%</td><td class="num">77.02%</td></tr>
+          <tr class="hl"><td>Generalist (this page's default)</td><td class="num">90.81%</td><td class="num">69.00%</td><td class="num">78.96%</td></tr>
+          <tr><td>4-model ensemble (offline)</td><td class="num">91.98%</td><td class="num">71.72%</td><td class="num">77.56%</td></tr>
+        </table>
+        <p class="muted">RAF-DB: 3,068 real-world test faces. FER2013: 7,178 grayscale 48×48 faces (human agreement ≈ 65%). CK+ was never used in training.</p>
+      </div>
+      <div class="card">
+        <h3>Highlights</h3>
+        <ul style="margin:0;padding-left:18px;color:var(--text-2)">
+          <li><b>Near state of the art</b> on RAF-DB with ~10× fewer parameters than POSTER++ (92.2%).</li>
+          <li><b>Multi-dataset training</b> lifted FER2013 from 55% to 69% and also improved unseen CK+.</li>
+          <li><b>Robustness tested</b> against blur, low light, noise, compression and occlusion. A mask hurts more than sunglasses.</li>
+          <li><b>Calibrated</b> confidence scores (temperature scaling, ECE 3.8% → 1.4%).</li>
+          <li><b>Deployment:</b> ONNX export, 1.9× faster than PyTorch on CPU with identical predictions.</li>
+        </ul>
+        <h3 style="margin-top:16px">Limitations & responsible use</h3>
+        <p class="muted" style="margin:0">Facial expression is not the same as felt emotion. Fear and Disgust are the weakest classes, and accuracy drops with heavy occlusion, blur or extreme head poses. This is a research demo and must not be used to judge, hire or surveil people.</p>
+        <h3 style="margin-top:16px">Links</h3>
+        <p style="margin:0"><a href="https://github.com/Hridye5h/Sentiment_Analysis" target="_blank" rel="noopener">GitHub repository</a> · <a href="https://huggingface.co/spaces/Hr1dye5h/facial-emotion-recognition" target="_blank" rel="noopener">Server version with Grad-CAM (Hugging Face)</a></p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="loader" id="loader"><div class="t" id="loaderText">Loading model…</div><div class="progress"><div id="loaderBar"></div></div></div>
+<footer class="wrap">Example photos are public domain (NASA; Dorothea Lange / Library of Congress). Built with PyTorch, ONNX Runtime Web and YuNet.</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.30.0/dist/ort.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

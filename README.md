@@ -2,7 +2,8 @@
 
 Facial emotion recognition on **RAF-DB**, mapped onto **3-, 5-, and 7-level sentiment scales**. A fine-tuned
 **DDAMFN** model reaches **91.07%** on the official test set (close to published state of the art) with only
-**4.19 M parameters**. A soft-vote ensemble with ConvNeXt-V2 reaches **91.59%**. The model is stress-tested for
+**4.19 M parameters**. Multi-dataset training (RAF-DB + FER2013) lifts FER2013 from 55% to 69%, and a 4-model
+ensemble reaches **91.98% on RAF-DB** and **71.7% on FER2013**. The model is stress-tested for
 robustness, occlusion and calibration, explained with Grad-CAM, and deployed as a live web demo.
 
 **▶ Live demo:** [huggingface.co/spaces/Hr1dye5h/facial-emotion-recognition](https://huggingface.co/spaces/Hr1dye5h/facial-emotion-recognition)
@@ -65,7 +66,8 @@ overall gain by giving up the rare *Fear* class (recall 0.68 → 0.55). Ensemble
 | --- | --- | --- | --- |
 | Ig3D | 94.0% | — | 2024 |
 | POSTER++ | 92.21% | 43.7 M | 2023 |
-| **This project (soft-vote ensemble)** | **91.59%** | 32.8 M | — |
+| **This project (4-model ensemble, RAF-DB + FER2013)** | **91.98%** | ~64.5 M | — |
+| This project (DDAMFN + ConvNeXt soft vote, RAF-DB only) | 91.59% | 32.8 M | — |
 | DDAMFN (paper) | 91.35% | 4.1 M | 2023 |
 | **This project (DDAMFN, single model)** | **91.07%** | **4.19 M** | — |
 
@@ -149,6 +151,37 @@ can switch back to the RAF-DB specialist.
 
 ![Multi-dataset training](assets/multidataset_before_after.png)
 
+## Multi-model ensemble — DDAMFN ×2 + ConvNeXt-V2 + Swin (`facial-emotion-ensemble-final.ipynb`)
+Three more models were trained on RAF-DB + FER2013 in parallel (`facial-emotion-member-*.ipynb`), all with the
+same data splits:
+- a second DDAMFN with a different seed and stronger augmentation
+- ConvNeXt-V2-tiny, a modern CNN
+- Swin-Tiny, a vision Transformer
+
+ConvNeXt and Swin start from ImageNet-22k weights. Each member saves its logits keyed by image, and the
+ensemble averages the four models' probabilities (**soft voting**). The final ensemble was **fixed in advance**
+(equal weights, all four multi-dataset models) and nothing was tuned on test data.
+
+| Model | RAF-DB | FER2013 | CK+ (never trained on) |
+| --- | --- | --- | --- |
+| Swin-Tiny | 88.10% | 69.00% | 69.90% |
+| ConvNeXt-V2-tiny | 88.49% | 70.45% | 75.51% |
+| DDAMFN (seed 7) | 91.40% | 68.32% | **81.88%** |
+| DDAMFN generalist | 90.81% | 69.00% | 78.96% |
+| **★ 4-model ensemble (final)** | **91.98%** | **71.72%** | 77.56% |
+
+*(overall accuracy; mean-class for the ensemble: RAF-DB 84.99%, FER2013 68.32%, CK+ 72.76%)*
+
+- The ensemble is the **best model on both training-distribution benchmarks**: RAF-DB 91.98%, within 0.23 points
+  of POSTER++, and FER2013 71.7%.
+- **Face-specific pretraining matters for unseen data.** On CK+ the DDAMFNs, whose backbone is pretrained on
+  MS-Celeb-1M faces, generalize best. The ImageNet-pretrained ConvNeXt and Swin transfer worse to posed lab faces
+  and pull the ensemble down there.
+- Ablation, not used for selection: adding the RAF-DB-only specialist gives 92.34% on RAF-DB but loses on FER2013,
+  so the pre-registered 4-model ensemble is reported.
+
+![Ensemble](assets/ensemble_vs_singles.png)
+
 ## Deployment — ONNX export & INT8 quantization
 The model is exported to **ONNX** as a static batch-1 graph. The model's coordinate-attention block splits on
 runtime height/width, so dynamic-shape export fails. The model is then statically quantized to **INT8**
@@ -196,6 +229,8 @@ On Kaggle: add the **RAF-DB dataset** (`train_labels.csv`, `test_labels.csv`, im
 | `facial-emotion-recognition-ensemble.ipynb` | DDAMFN + ConvNeXt-V2 ensemble with ablation. |
 | `facial-emotion-analysis.ipynb` | Robustness, occlusion, calibration, failure analysis, t-SNE and per-emotion Grad-CAM (needs the trained checkpoint). |
 | `facial-emotion-multidataset.ipynb` | Fine-tunes the model on RAF-DB + FER2013 (the generalist); evaluates on RAF-DB, FER2013 and the held-out CK+. |
+| `facial-emotion-member-{ddamfn,convnext,swin}.ipynb` | Ensemble members trained on RAF-DB + FER2013; each saves logits for the ensemble. |
+| `facial-emotion-ensemble-final.ipynb` | Soft-voting ensemble of the 4 multi-dataset models, with ablation. |
 | `facial-emotion-generalization.ipynb` | Zero-shot evaluation on FER2013 and CK+, plus ONNX export and INT8 quantization (needs the checkpoint, FER2013 and CK+). |
 
 ## Limitations

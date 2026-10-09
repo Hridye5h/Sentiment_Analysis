@@ -6,8 +6,10 @@ Facial emotion recognition on **RAF-DB**, mapped onto **3-, 5-, and 7-level sent
 ensemble reaches **91.98% on RAF-DB** and **71.7% on FER2013**. The model is stress-tested for
 robustness, occlusion and calibration, explained with Grad-CAM, and deployed as a live web demo.
 
-**▶ Live demo:** [huggingface.co/spaces/Hr1dye5h/facial-emotion-recognition](https://huggingface.co/spaces/Hr1dye5h/facial-emotion-recognition)
-(Grad-CAM explanations · real-time webcam · group-photo mood meter · specialist / generalist model switch)
+**▶ Live demo (runs entirely in your browser):** **[hridye5h.github.io/Sentiment_Analysis](https://hridye5h.github.io/Sentiment_Analysis/)**
+Real-time webcam emotions, photo analysis with occlusion-sensitivity explanations, and a group-photo mood meter.
+The models run on-device with ONNX Runtime Web, so images are never uploaded and the page never sleeps.
+Server version with Grad-CAM: [Hugging Face Space](https://huggingface.co/spaces/Hr1dye5h/facial-emotion-recognition).
 
 ![Grad-CAM explanation](assets/gradcam_explainer_example.png)
 
@@ -215,7 +217,12 @@ kernels. That makes it worth using only where size matters, such as mobile or th
 - Both **overall** and **mean-class (balanced)** accuracy are reported, with one consistent 3-/5-scale mapping.
 
 ## Deployment
-A Gradio app on Hugging Face Spaces (CPU). It detects faces with OpenCV **YuNet**, aligns them using the eye
+**Web app (`docs/`, GitHub Pages):** both networks (YuNet face detector + DDAMFN) run in the browser through
+ONNX Runtime Web (WebAssembly). Detection takes ~30 ms and classification ~45 ms per face on a laptop, about
+12 fps live, with no server. The browser pipeline reproduces the Python pipeline's predictions (same faces, same
+labels on the example photos). Models are cached after the first visit.
+
+**Server app (`hf_space/`, Hugging Face):** a Gradio app on Hugging Face Spaces (CPU). It detects faces with OpenCV **YuNet**, aligns them using the eye
 landmarks and crops them tightly to match RAF-DB's aligned faces. Crop geometry matters: on a group photo of
 smiling people, a loose crop that includes hair and shoulders flipped 7 of 9 faces away from *Happiness*, while
 the RAF-DB-style tight crop got all 9 right.

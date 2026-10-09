@@ -356,5 +356,15 @@ renderBars($('liveBars'), CLASSES.map(() => 0)); renderBars($('photoBars'), CLAS
 // warm up: fetch the detector + default model in the background so the first click is instant
 session('yunet').then(() => session(modelKey)).catch(() => {});
 
+// deep links for demos: #group / #photo open that tab and run its first example (#photo also explains it)
+(async () => {
+  const h = location.hash.replace('#', '');
+  if (h !== 'group' && h !== 'photo') return;
+  document.querySelector(`.tab[data-tab="${h}"]`).click();
+  const img = await loadImage(document.querySelector(`.examples[data-target="${h}"] img`).src);
+  if (h === 'group') await analyseGroup(img); else { await analysePhoto(img); await explain(); }
+  document.body.dataset.demoDone = '1';
+})();
+
 // expose for automated checks
 window.__fer = { detectFaces, alignCrop, toTensorData, classifyData, analysePhoto, analyseGroup, loadImage, setModel: (k) => { modelKey = k; } };
